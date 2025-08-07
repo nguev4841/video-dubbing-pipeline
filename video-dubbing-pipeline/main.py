@@ -1,18 +1,31 @@
-# Main orchestration script
-from scripts.transcribe import transcribe_audio
-from scripts.translate import translate_text
-from scripts.tts import generate_speech
-from scripts.lipsync import apply_lipsync
-from scripts.utils import extract_audio, combine_audio_with_video
+import os
+from scripts import transcribe, translate, tts, lipsync
 
-INPUT_VIDEO = "input/input.mp4"
-LANGUAGE_TO = "es"
+INPUT_VIDEO = "myvideo.mp4"
+OUTPUT_VIDEO = "dubbed_video.mp4"
+LANG_SOURCE = "ko"  # Korean
+LANG_TARGET = "en"  # English
+TTS_ENGINE = "elevenlabs"  # Change to "tortoise" to use Tortoise TTS
 
-if __name__ == "__main__":
-    audio_path = extract_audio(INPUT_VIDEO)
-    transcription = transcribe_audio(audio_path)
-    translated_text = translate_text(transcription, to_lang=LANGUAGE_TO)
-    tts_audio_path = generate_speech(translated_text)
-    synced_video_path = apply_lipsync(INPUT_VIDEO, tts_audio_path)
-    final_output = combine_audio_with_video(synced_video_path, tts_audio_path)
-    print(f"✅ Done! Output: {final_output}")
+TEMP_DIR = "temp"
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+# Step 1: Transcribe
+transcript_path = os.path.join(TEMP_DIR, "transcript.txt")
+transcribe.transcribe_audio(INPUT_VIDEO, transcript_path, language=LANG_SOURCE)
+
+# Step 2: Translate
+translated_path = os.path.join(TEMP_DIR, "translated.txt")
+translate.translate_text(transcript_path, translated_path, src_lang=LANG_SOURCE, tgt_lang=LANG_TARGET)
+
+# Step 3: TTS
+tts_audio_path = os.path.join(TEMP_DIR, "tts.wav")
+with open(translated_path, "r", encoding="utf-8") as f:
+    text = f.read()
+
+tts.synthesize_speech(text, output_path=tts_audio_path, engine=TTS_ENGINE)
+
+# Step 4: Lip-sync
+lipsync.lipsync_video(INPUT_VIDEO, tts_audio_path, OUTPUT_VIDEO)
+
+print(f"\n✅ Dubbing complete! Output saved as: {OUTPUT_VIDEO}")
