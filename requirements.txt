@@ -1,0 +1,12 @@
+torch
+torchaudio
+transformers
+openai-whisper
+argostranslate
+tqdm
+moviepy
+numpy
+opencv-python-headless
+scipy
+gfpgan
+ffmpeg-python

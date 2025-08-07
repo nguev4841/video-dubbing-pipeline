@@ -1,0 +1,6 @@
+services:
+  dubbing:
+    build: .
+    volumes:
+      - .:/app
+    working_dir: /app
