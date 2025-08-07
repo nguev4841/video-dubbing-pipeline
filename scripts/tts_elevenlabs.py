@@ -1,62 +1,38 @@
-import os
 import requests
-import json
-from pathlib import Path
+import time
 
-ELEVENLABS_API_KEY = "sk_3c438e1d15e15aa72485c0d29ce60edf2db31c4d7f75fe32"
+ELEVENLABS_API_KEY = "sk_c7f6bcaecb5748089b52ed839a74a6e8eda2ffbc27be06ed"
+ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # Default voice, you can change if needed
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech"
 
-OUTPUT_DIR = Path("output/audio")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+headers = {
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+    "xi-api-key": ELEVENLABS_API_KEY,
+}
 
-# You can optionally set a specific voice_id, or leave as None to let the script auto-pick.
-DEFAULT_VOICE_ID = None  # Example: "21m00Tcm4TlvDq8ikWAM"  (Rachel)
-
-def list_voices():
-    response = requests.get(
-        "https://api.elevenlabs.io/v1/voices",
-        headers={"xi-api-key": ELEVENLABS_API_KEY}
-    )
-    response.raise_for_status()
-    return response.json()["voices"]
-
-def get_best_matching_voice(language="ko"):
-    voices = list_voices()
-    # Simple heuristic: choose first Korean voice or fallback
-    for voice in voices:
-        if language in (voice.get("labels") or {}).get("language", ""):
-            return voice["voice_id"]
-    return voices[0]["voice_id"] if voices else None
-
-def generate_speech(text, filename, voice_id=None, language="ko"):
-    if not voice_id:
-        voice_id = get_best_matching_voice(language)
-        print(f"Auto-selected voice: {voice_id}")
-
-    url = f"{ELEVENLABS_API_URL}/{voice_id}"
-    headers = {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json"
-    }
+def tts_elevenlabs(text, voice_id=ELEVENLABS_VOICE_ID, output_path="output.wav"):
     payload = {
         "text": text,
-        "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.5,
+            "stability": 0.75,
             "similarity_boost": 0.75
         }
     }
 
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
-    response.raise_for_status()
+    url = f"{ELEVENLABS_API_URL}/{voice_id}/stream"
 
-    audio_path = OUTPUT_DIR / filename
-    with open(audio_path, "wb") as f:
-        f.write(response.content)
-    print(f"Saved ElevenLabs audio to {audio_path}")
-    return audio_path
+    response = requests.post(url, json=payload, headers=headers, stream=True)
 
-# Example use:
-if __name__ == "__main__":
-    sample_text = "안녕하세요. 이것은 ElevenLabs를 사용한 테스트입니다."
-    generate_speech(sample_text, "sample_ko.mp3")
+    if response.status_code != 200:
+        raise Exception(f"ElevenLabs TTS failed: {response.status_code} {response.text}")
+
+    with open(output_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
+
+    # Optional small delay for API limits
+    time.sleep(0.5)
+
+    return output_path
